@@ -46,8 +46,8 @@ app.get("/fetch-store-a-customers", async (req, res) => {
 
 app.post("/sync-store-a-to-b", async (req, res) => {
   try {
-    const count = await syncMembers();
-    res.json({ success: true, processed: count });
+    const results = await syncMembers();
+    res.json({ success: true, processed: results.length, details: results });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

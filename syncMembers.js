@@ -1,161 +1,3 @@
-// import dotenv from "dotenv";
-// dotenv.config();
-
-// import { shopifyClient } from "./shopify.js";
-
-// const storeA = shopifyClient(
-//   process.env.STORE_A_DOMAIN,
-//   process.env.STORE_A_TOKEN
-// );
-
-// const storeB = shopifyClient(
-//   process.env.STORE_B_DOMAIN,
-//   process.env.STORE_B_TOKEN
-// );
-
-// /**
-//  * Fetch customers from Store A
-//  */
-// export async function fetchStoreAMembers() {
-//   const res = await storeA.get("/customers.json?limit=10");
-
-//   console.log("📦 Total customers fetched:", res.data.customers.length);
-
-//   res.data.customers.forEach((c, index) => {
-//     const tags = c.tags
-//       ? c.tags.split(",").map(t => t.trim().toLowerCase())
-//       : [];
-
-//     const isMember = tags.includes("member");
-
-//     console.log(
-//       `👤 ${index + 1}. ${c.email || "NO EMAIL"} | ${c.first_name || ""} ${c.last_name || ""}`
-//     );
-//     console.log(
-//       `   🏷️ Tags: [${tags.join(", ")}] → Member: ${isMember ? "YES ✅" : "NO ❌"}`
-//     );
-//   });
-
-//   return res.data.customers;
-// }
-
-// export async function inviteToStoreB(customer) {
-//   if (!customer.email) return;
-
-//   const tags = customer.tags || "";
-
-//   const existingCustomer = await findCustomerInStoreB(customer.email);
-
-//   /* 🟢 CASE 1: Customer already exists → UPDATE TAGS */
-//   if (existingCustomer) {
-//     await updateStoreBCustomerTags(existingCustomer.id, tags);
-
-//     console.log(
-//       `🔁 Tags updated for existing customer: ${customer.email} → [${tags}]`
-//     );
-//     return;
-//   }
-
-//   /* 🟢 CASE 2: Customer does not exist → CREATE + INVITE */
-//   await storeB.post("/customers.json", {
-//     customer: {
-//       email: customer.email,
-//       first_name: customer.first_name,
-//       last_name: customer.last_name,
-//       tags: tags,
-//       send_email_invite: true
-//     }
-//   });
-
-//   console.log(
-//     `📩 Invite sent (new customer) with tags [${tags}]: ${customer.email}`
-//   );
-// }
-
-
-// async function findCustomerInStoreB(email) {
-//   const res = await storeB.get(
-//     `/customers/search.json?query=email:${email}`
-//   );
-
-//   return res.data.customers.length > 0
-//     ? res.data.customers[0]
-//     : null;
-// }
-
-// async function updateStoreBCustomerTags(customerId, tags) {
-//   console.log("🛠️ Updating Store B customer:", customerId);
-//   console.log("🛠️ New tags:", tags);
-
-//   const res = await storeB.put(`/customers/${customerId}.json`, {
-//     customer: {
-//       id: customerId,
-//       tags: tags
-//     }
-//   });
-
-//   console.log("✅ Shopify response:", res.status);
-// }
-
-// export async function syncSingleCustomerToStoreB(customerId) {
-//   // 🔁 Fresh customer fetch from Store A
-//   const res = await storeA.get(`/customers/${customerId}.json`);
-//   const customer = res.data.customer;
-
-//   if (!customer.email) return;
-
-//   // 🔍 Check if exists in Store B
-//   const search = await storeB.get(
-//     `/customers/search.json?query=email:${customer.email}`
-//   );
-
-//   if (search.data.customers.length > 0) {
-//     const existing = search.data.customers[0];
-
-//     // 🔁 UPDATE tags / name
-//     await storeB.put(`/customers/${existing.id}.json`, {
-//       customer: {
-//         id: existing.id,
-//         first_name: customer.first_name,
-//         last_name: customer.last_name,
-//         tags: customer.tags || ""
-//       }
-//     });
-
-//     console.log(`🔁 Store B updated: ${customer.email}`);
-//     return;
-//   }
-
-//   // 🆕 CREATE + INVITE
-//   await storeB.post("/customers.json", {
-//     customer: {
-//       email: customer.email,
-//       first_name: customer.first_name,
-//       last_name: customer.last_name,
-//       tags: customer.tags || "",
-//       send_email_invite: true
-//     }
-//   });
-
-//   console.log(`📩 Store B invited: ${customer.email}`);
-// }
-
-// export async function syncMembers() {
-//   const customers = await fetchStoreAMembers();
-
-//   for (const customer of customers) {
-//     const tags = customer.tags
-//       ? customer.tags.toLowerCase()
-//       : "";
-
-//     if (!tags.includes("member")) continue;
-
-//     await inviteToStoreB(customer);
-//   }
-
-//   return customers.length;
-// }
-
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -331,7 +173,7 @@ export async function disableCustomerInStoreBByCustomerId(customerId) {
 
 export async function syncMembers() {
   const customers = await fetchStoreAMembers();
-  let processed = 0;
+  const results = [];
 
   for (const customer of customers) {
     const tags = (customer.tags || "").toLowerCase();
@@ -339,8 +181,14 @@ export async function syncMembers() {
     if (!tags.includes("member")) continue;
 
     await syncSingleCustomerToStoreB(customer.id);
-    processed++;
+
+    results.push({
+      id: customer.id,
+      email: customer.email,
+      tags: customer.tags,
+      synced: true
+    });
   }
 
-  return processed;
+  return results;
 }
