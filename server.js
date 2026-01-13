@@ -1,8 +1,17 @@
 import express from "express";
 import dotenv from "dotenv";
-import { syncMembers, fetchStoreAMembers,syncSingleCustomerToStoreB, disableCustomerInStoreBByCustomerId } from "./syncMembers.js";
+import config from "./src/config/config.js";
+import { syncMembers, fetchStoreAMembers, syncSingleCustomerToStoreB, disableCustomerInStoreBByCustomerId, hasRequiredTag } from "./src/syncMembers.js";
 
 dotenv.config();
+
+// Fail fast if configuration is invalid
+try {
+  config.validate();
+} catch (err) {
+  console.error("⚠️ Configuration validation failed:", err.message);
+  process.exit(1);
+}
 
 const app = express();
 
@@ -71,6 +80,12 @@ app.post("/webhooks/customer-create", async (req, res) => {
   console.log("📧 Email:", customer.email);
   console.log("🏷️ Tags (webhook):", customer.tags ?? "(not sent)");
 
+  // If the webhook payload doesn't include the required member tag, skip syncing
+  if (!hasRequiredTag(customer.tags)) {
+    console.log(`⛔ Skipping webhook create for ${customer.email}: missing required tag(s)`);
+    return res.sendStatus(200);
+  }
+
   // 🔥 REAL SYNC
   await syncSingleCustomerToStoreB(customer.id);
 
@@ -91,7 +106,12 @@ app.post("/webhooks/customer-update", async (req, res) => {
 
   console.log("🟡 WEBHOOK UPDATE HIT:", customer.email);
 
-  // 🔥 THIS IS THE MISSING LINE
+  // Only sync when the update indicates this is a member (contains the required tag)
+  if (!hasRequiredTag(customer.tags)) {
+    console.log(`⛔ Skipping webhook update for ${customer.email}: missing required tag(s)`);
+    return res.sendStatus(200);
+  }
+
   await syncSingleCustomerToStoreB(customer.id);
 
   res.sendStatus(200);
@@ -116,6 +136,24 @@ app.post("/webhooks/customer-delete", async (req, res) => {
 
 
 /* ====================================================== */
+
+// Health check - reports configuration validation and configured stores (no tokens)
+app.get('/health', (req, res) => {
+  try {
+    // Re-validate to ensure current environment is still valid
+    config.validate();
+    const stores = Object.entries(config.getStores()).map(([key, entry]) => ({ key, domain: entry.domain }));
+
+    return res.json({
+      ok: true,
+      primary: config.PRIMARY_STORE,
+      stores,
+      allowInvites: config.ALLOW_INVITES
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "sync": "node runSync.js",
+    "sync:single": "node runSync.js --id"
   },
   "keywords": [],
   "author": "",
