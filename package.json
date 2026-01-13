@@ -4,8 +4,10 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js"
+    "dev": "node init && nodemon server.js",
+    "start": "node init && node server.js",
+    "sync": "node runSync.js",
+    "sync:single": "node runSync.js --id"
   },
   "keywords": [],
   "author": "",
